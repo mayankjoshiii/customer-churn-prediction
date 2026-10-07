@@ -1,99 +1,76 @@
 # Customer Churn Prediction Pipeline
 
-**Tools:** Python (pandas, scikit-learn, matplotlib, seaborn) · SQL (sqlite3) · Plotly.js · GitHub Pages  
-**Dataset:** Telco Customer Churn — [Kaggle](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) (7,043 records)  
-**Model accuracy:** 82% | AUC-ROC: 0.86  
-**Live Dashboard:** [🔗 View Live Interactive Dashboard](https://mayankjoshiii.github.io/customer-churn-prediction/)
+**Tools:** Python (pandas, scikit-learn, matplotlib, seaborn) · SQL (sqlite3) · Plotly.js · GitHub Pages
+**Dataset:** IBM Telco Customer Churn sample, via [Kaggle](https://www.kaggle.com/datasets/blastchar/telco-customer-churn). 7,043 customers, charges in US dollars. This is a public teaching dataset for a fictional telecom company, not real company data.
+**Best model:** Logistic regression, 80.4% accuracy and AUC 0.845 on a 20% hold-out (5-fold cross-validated AUC 0.848 ± 0.013). For context, always predicting "no churn" scores 73.5% accuracy, so AUC is the more meaningful number.
+**Live dashboard:** [View the interactive dashboard](https://mayankjoshiii.github.io/customer-churn-prediction/)
+
+![Model evaluation](model_evaluation.png)
 
 ---
 
-## Problem Statement
+## Problem
 
-A telecom company loses ~27% of its customers annually. Can we predict which customers are about to churn — and translate that prediction into a concrete retention strategy?
-
----
+About 26.5% of customers in this dataset churned. Can we predict who is likely to leave, and turn that into a sensible retention offer?
 
 ## Approach
 
-| Step | Description |
-|------|-------------|
-| 1. SQL Exploration | Segmentation queries via `sqlite3` — tenure, contract type, monthly charges |
-| 2. Data Cleaning | Handle missing values, encode categoricals, scale features |
-| 3. Feature Engineering | Create tenure bands, charge-per-service ratio, engagement score |
-| 4. Modelling | Logistic Regression + Random Forest — comparison with cross-validation |
-| 5. Evaluation | Confusion matrix, ROC curve, precision/recall, feature importance |
-| 6. Business Output | Translate model to actionable retention recommendation |
+| Step | What happens | Where |
+|------|-------------|-------|
+| 1. SQL exploration | Churn rate by contract type and tenure band, queried with `sqlite3` | notebook |
+| 2. Cleaning | 11 blank `TotalCharges` values (brand-new customers) filled with the median | both |
+| 3. Feature engineering | Charge-per-month ratio, new-customer flag (tenure 6 months or less), high-charge flag (over $70) | both |
+| 4. Modelling | Logistic regression (scaled) and random forest, 80/20 stratified split, scaler fitted on training data only | both |
+| 5. Validation | 5-fold cross-validated AUC on the training split | both |
+| 6. Evaluation | Confusion matrix, ROC curves, random forest feature importances | both |
+| 7. Business output | Out-of-fold churn probabilities for a high-risk segment and an illustrative retention estimate | notebook |
 
----
+`churn_model.py` and `churn_pipeline.ipynb` use the same method and give the same numbers.
 
-## Key Results
+## Results (20% hold-out, 1,409 customers)
 
-| Model | Accuracy | AUC-ROC | Precision (Churn) | Recall (Churn) |
-|-------|----------|---------|-------------------|----------------|
-| Logistic Regression | 80% | 0.84 | 0.67 | 0.58 |
-| Random Forest | **82%** | **0.86** | **0.71** | **0.63** |
+| Model | Accuracy | AUC-ROC | 5-fold CV AUC | Precision (churn) | Recall (churn) |
+|-------|----------|---------|---------------|-------------------|----------------|
+| **Logistic regression** | **80.4%** | **0.845** | **0.848 ± 0.013** | 0.66 | 0.53 |
+| Random forest | 78.1% | 0.821 | 0.826 ± 0.014 | 0.61 | 0.50 |
 
----
+Recall on the churn class is only about 0.5 at the default 0.5 threshold, so in practice you would lower the threshold to catch more churners and accept more false alarms.
 
-## Business Recommendation
+## What drives churn (straight from the data)
 
-> **Targeting the 3 highest-risk segments (Month-to-month contracts + Fibre Optic + High monthly charges) with a proactive retention offer — a 12-month contract discount — is projected to reduce overall churn by 12–15%, saving approximately £340,000 in annual revenue per 10,000 customers.**
+1. **Contract type:** month-to-month customers churn at 42.7%, against 11.3% on one-year and 2.8% on two-year contracts.
+2. **Tenure:** customers in their first 6 months churn at 52.9%.
+3. **Internet service:** fibre optic customers churn at 41.9%, against 19.0% for DSL.
+4. **Payment method:** electronic cheque users churn at 45.3%, the highest of the four methods.
 
-Top 3 churn drivers identified:
+## Retention idea (illustrative)
 
-1. **Contract type** — Month-to-month customers churn at 3.4× the rate of annual contract holders
-2. **Tenure** — Customers in their first 6 months are at highest risk (42% churn rate)
-3. **Internet service** — Fibre Optic subscribers churn at 2.1× the rate of DSL users
+The highest-risk segment, month-to-month + fibre optic + monthly charges over $70, has 2,017 customers (28.6% of the base), and 54% of them churned. If 30% of the likely churners in that segment accepted a discounted 12-month contract, around 325 customers and roughly $343K a year in revenue would be kept. **The 30% uptake is an assumption, not a measurement.** Change it in the last notebook cell to see how sensitive the estimate is.
 
----
-
-## Repository Structure
+## Repository structure
 
 ```
 customer-churn-prediction/
-├── index.html               # Interactive Plotly.js dashboard (deployed via GitHub Pages)
-├── churn_model.py           # Modular ML pipeline — load, clean, engineer, train, evaluate
-├── churn_pipeline.ipynb     # Exploratory notebook with full analysis walkthrough
-├── WA_Fn-UseC_-Telco-Customer-Churn.csv  # Source dataset
-├── requirements.txt         # Python dependencies
-├── LICENSE                  # MIT License
-└── README.md                # This file
+├── index.html                              Interactive Plotly.js dashboard (GitHub Pages)
+├── churn_model.py                          Reproducible pipeline; --export writes model_results.json
+├── churn_pipeline.ipynb                    Notebook with SQL exploration, modelling and outputs
+├── model_results.json                      Real model metrics, ROC points and importances used by the dashboard
+├── model_evaluation.png                    Confusion matrix, ROC curves and feature importances
+├── WA_Fn-UseC_-Telco-Customer-Churn.csv    Source dataset
+└── requirements.txt
 ```
 
----
+## Run it
 
-## How to Run Locally
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/mayankjoshiii/customer-churn-prediction.git
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Run the pipeline:
-
-   ```bash
-   python churn_model.py
-   ```
-
-4. Open `index.html` in any modern browser to view the dashboard — no server required.
-
----
-
-## Live Dashboard
-
-👉 [View the Interactive Dashboard](https://mayankjoshiii.github.io/customer-churn-prediction/)
-
----
+```bash
+git clone https://github.com/mayankjoshiii/customer-churn-prediction.git
+cd customer-churn-prediction
+pip install -r requirements.txt
+python churn_model.py            # prints metrics
+python churn_model.py --export   # also refreshes model_results.json for the dashboard
+```
 
 ## Author
 
-**Mayank Joshi** — Business Analyst & Data Analyst  
-MSc Business Analytics (Distinction) · Swansea University  
-[LinkedIn](https://www.linkedin.com/in/mayankjoshi518/) · [GitHub](https://github.com/mayankjoshiii)
+**Mayank Joshi**, Business and Data Analyst · MSc Business Analytics (Distinction), Swansea University
+[LinkedIn](https://www.linkedin.com/in/mayank-joshi-analyst/) · [GitHub](https://github.com/mayankjoshiii)
